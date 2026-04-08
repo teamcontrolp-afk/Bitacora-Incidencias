@@ -2,121 +2,95 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Bitácora de Incidencias 2026</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bitácora Firebase</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-body{margin:0;font-family:Arial;background:#071830;color:#e0f2fe}
-header{background:#0d2b5e;padding:16px 26px;font-weight:700}
-.controls{padding:16px 26px}
-button{background:#1e88e5;border:0;color:#fff;padding:8px 14px;border-radius:6px;cursor:pointer}
-button:hover{background:#1565c0}
-.status{margin-left:12px;font-size:13px}
-.ok{color:#34d399}
-.err{color:#f87171}
-table{width:100%;border-collapse:collapse;font-size:12px}
-th,td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.1)}
-th{background:#103766;font-size:10px;text-transform:uppercase}
+body{font-family:Arial;background:#071830;color:#e0f2fe;margin:0;padding:20px}
+input,textarea,button{width:100%;margin-top:8px;padding:8px}
+button{background:#1e88e5;color:#fff;border:0;cursor:pointer}
+table{width:100%;border-collapse:collapse;margin-top:20px}
+th,td{border-bottom:1px solid #234;padding:6px;font-size:12px}
+th{background:#123}
 </style>
 </head>
-
 <body>
 
-<header>BITÁCORA DE INCIDENCIAS — Control de Producción 2026</header>
+<h2>Bitácora de Incidencias (Firebase)</h2>
 
-<div class="controls">
-  <button onclick="cargarDatos()">↻ Actualizar</button>
-  <span id="estado" class="status">—</span>
-</div>
+<input id="usuario" placeholder="Usuario">
+<input id="fecha" type="date">
+<input id="prioridad" placeholder="Prioridad">
+<input id="area" placeholder="Área">
+<input id="linea" placeholder="Línea">
+<textarea id="detalle" placeholder="Detalle"></textarea>
 
+<button onclick="guardar()">Guardar registro</button>
+
+<h3>Historial</h3>
 <table>
-<thead>
-<tr>
-  <th>#</th>
-  <th>Fecha evento</th>
-  <th>Prioridad</th>
-  <th>Tipo</th>
-  <th>Área</th>
-  <th>Línea</th>
-  <th>Detalle</th>
-  <th>Estado</th>
-  <th>Usuario</th>
-  <th>Fecha registro</th>
-  <th>Hora</th>
-</tr>
-</thead>
-<tbody id="tbody">
-<tr><td colspan="11">Cargando…</td></tr>
-</tbody>
+  <thead>
+    <tr>
+      <th>Fecha</th>
+      <th>Prioridad</th>
+      <th>Área</th>
+      <th>Línea</th>
+      <th>Detalle</th>
+      <th>Usuario</th>
+    </tr>
+  </thead>
+  <tbody id="tbody"></tbody>
 </table>
 
-<script>
-const API_URL =
-'https://script.google.com/macros/s/AKfycbwjBQxuBiBr6_rVuVaj626XriLMhX5mdG5nb635UEUHZ7DVA3MpR2fq1fUcS33shM2R/exec';
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+import { getFirestore, collection, addDoc, getDocs, query, orderBy } 
+  from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
-function cargarDatos(){
-  const estado = document.getElementById('estado');
-  const tbody = document.getElementById('tbody');
-  estado.textContent = 'Conectando…';
-  estado.className = 'status';
+// ✅ TU CONFIG REAL
+const firebaseConfig = {
+  apiKey: "AIzaSy6DUqJ2F5XI6EdNBAW6tX79qMM40G8hw",
+  authDomain: "bitacorainc.firebaseapp.com",
+  projectId: "bitacorainc",
+  storageBucket: "bitacorainc.firebasestorage.app",
+  messagingSenderId: "943929074140",
+  appId: "1:943929074140:web:140cfe90f8fe3a35b7639"
+};
 
-  const cb = 'cb_' + Date.now();
-  let finished = false;
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
-  window[cb] = function(json){
-    finished = true;
-    delete window[cb];
-    script.remove();
+// guardar
+window.guardar = async () => {
+  await addDoc(collection(db, "incidencias"), {
+    usuario: usuario.value,
+    fecha: fecha.value,
+    prioridad: prioridad.value,
+    area: area.value,
+    linea: linea.value,
+    detalle: detalle.value,
+    createdAt: new Date()
+  });
+  cargar();
+};
 
-    if(!json || !json.ok){
-      mostrarError();
-      return;
-    }
-
-    const data = json.data || [];
-    if(!data.length){
-      tbody.innerHTML = '<tr><td colspan="11">No hay registros</td></tr>';
-    } else {
-      tbody.innerHTML = data.map(r=>`
-        <tr>
-          <td>${r.ID}</td>
-          <td>${r.Fecha}</td>
-          <td>${r.Prioridad}</td>
-          <td>${r.Tipo}</td>
-          <td>${r.Area}</td>
-          <td>${r.Linea}</td>
-          <td>${r.Detalle}</td>
-          <td>${r.Estado}</td>
-          <td>${r.Usuario}</td>
-          <td>${r.HoraRegistro}</td>
-          <td>${r.HoraRegistro}</td>
-        </tr>
-      `).join('');
-    }
-
-    estado.textContent = 'Conectado';
-    estado.classList.add('ok');
-  };
-
-  const script = document.createElement('script');
-  script.src = API_URL + '?callback=' + cb;
-  document.body.appendChild(script);
-
-  // ⏱️ timeout real (no script.onerror)
-  setTimeout(()=>{
-    if(!finished){
-      mostrarError();
-    }
-  }, 8000);
+// cargar historial
+async function cargar(){
+  const q = query(collection(db, "incidencias"), orderBy("createdAt","desc"));
+  const snap = await getDocs(q);
+  tbody.innerHTML = snap.docs.map(d=>{
+    const r = d.data();
+    return `<tr>
+      <td>${r.fecha}</td>
+      <td>${r.prioridad}</td>
+      <td>${r.area}</td>
+      <td>${r.linea}</td>
+      <td>${r.detalle}</td>
+      <td>${r.usuario}</td>
+    </tr>`;
+  }).join("");
 }
 
-function mostrarError(){
-  document.getElementById('estado').textContent = 'Error de conexión';
-  document.getElementById('estado').className = 'status err';
-  document.getElementById('tbody').innerHTML =
-    '<tr><td colspan="11" class="err">Error al cargar datos desde Google Sheets</td></tr>';
-}
-
-cargarDatos();
+cargar();
 </script>
 
 </body>
